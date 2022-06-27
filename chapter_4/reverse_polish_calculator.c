@@ -30,7 +30,7 @@ int main() {
                 break;
             case '-':
                 op2=pop();
-                push(op2-pop());
+                push(pop()-op2);
                 break;
             case '*':
                 push(pop()*pop(0));
@@ -41,7 +41,7 @@ int main() {
                 break;
         }
     }
-    printf("%f",pop());
+    printf("%f\n",pop());
 }
 double pop() {
     if(curr_stack_position>0)
