@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <math.h>
 #include <ctype.h>
 #define SIZE 5
 void swap(int*,int*); 
