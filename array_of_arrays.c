@@ -26,18 +26,19 @@ int64_t** marray_read(size_t* rows, size_t** sizes) {
 	*sizes = malloc(sizeof(size_t) * (*rows));
 	int64_t** marray = malloc(sizeof(int64_t*) * (*rows));
 	for(size_t i=0;i<(*rows);i++) {
-		(*sizes)[i]=read_size();
-		(*marray)[i]=array_int_read((*sizes)[i]);
+		marray[i]=array_int_read(&((*sizes)[i]));
 	}
-	// for(size_t i=0;i<(*rows);i++) {
-	// 	printf("%" PRId64 " " )
-	// }
+	return marray;
+}
+void marray_free(int** array, size_t rows) {
+	for(size_t i=0;i<rows;i++)
+		free(array[i]);
+	free(array);
 }
 int main(void) {
 	size_t* sizes=NULL;
 	size_t rows;
 	int64_t** marray = marray_read(&rows,&sizes);
-	for(size_t i=0;i<rows;i++) {
-		printf("%" PRId64 " ", (*marray)[i]);
-	}
+}
+int main(void) {
 }
