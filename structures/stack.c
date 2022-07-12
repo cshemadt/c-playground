@@ -20,7 +20,7 @@ void add_node_front(struct node* old, int64_t value) {
 }
 int main(void) {
 	struct node* node = node_create(15);
-	node_print(node);
+	/*node_print(node);*/
 	add_node_front(node, 20);
 	return 0;
 }
