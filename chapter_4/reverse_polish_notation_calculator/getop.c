@@ -8,7 +8,7 @@ int getop(char s[]) {
         ;
     s[1]='\0';
     sign=(c=='-')?-1:1;
-    if(!isdigit(c) && c!='.' && c!='-')
+    if(!isdigit(c) && c!='.')
         return c;
     i=0;
     if(isdigit(c))

@@ -4,15 +4,13 @@
 #define ASCII_SHIFT 55
 int htoi(char s[]);
 int my_strlen(char s[]);
-int main(int argc, char** argv) {
-	if(argc > 1)
-	{
+int main(int argc, char** argv) { {}
+	if(argc > 1) {
 		printf("%d\n",htoi(argv[1]));
 	}
 }
 int htoi(char s[]) {
-
-	int res=0;
+	long long res=0;
 	int end=-1;
 	int pow_base_index=0;
 	if(s[0]=='0' && (s[1]=='x' || s[1]=='X'))
