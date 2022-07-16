@@ -1,7 +1,5 @@
-#include <inttypes.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
+#include "arithmetic.c"
 struct int_array { int64_t *data; size_t size; };
 struct int_array create_int_array(size_t sz);
 struct stack {
@@ -14,5 +12,5 @@ void stack_destroy(struct stack *s);
 bool is_stack_full(struct stack *s);
 bool is_stack_empty(struct stack *s);
 void print_stack(struct stack *s);
-int64_t pop(struct stack *s);
+struct maybe_i64 pop(struct stack *s);
 bool push(struct stack *s, int64_t value);
