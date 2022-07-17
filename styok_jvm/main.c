@@ -10,7 +10,10 @@ enum opcode {
 	BC_ICMP,
 	BC_STOP
 };
-struct bc_noarg { enum opcode opcode; };
+struct bc_noarg { 
+	enum opcode opcode; 
+	size_t req_stack_size;
+};
 struct bc_arg64 { enum opcode opcode; int64_t arg; };
 union ins {
 	enum opcode opcode;
@@ -28,18 +31,12 @@ void vm_state_destroy(struct vm_state *vm) {
 
 	free(vm->data_stack.data.data);
 }
-/* TODO:
- * - maybe_i64 tests
- */
 union ins program[] = {
 	{BC_IREAD},
 	{BC_IREAD},
-	{BC_IREAD},
-	{BC_IDIV},
-	{BC_SWAP},
-    {BC_STOP}
+	{BC_ICMP},
+	{BC_STOP}
 };
-/* TODO: Move it to header file */
 void interpret_push(struct vm_state* state);
 void interpret_iread(struct vm_state* state );
 void interpret_iprint(struct vm_state *state );
@@ -140,13 +137,14 @@ void interpret(struct vm_state *state) {
 		state->ip++;
 	}
 }
-void interpret_program(union ins *program) {
-	struct vm_state state = vm_state_create(program);
-	interpret(&state);
-	print_stack(&(state.data_stack));
-	vm_state_destroy(&state);
+void interpret_program(union ins *pr) {
+	struct vm_state state = vm_state_create(pr);
+	if(sizeof(program)/sizeof(program[0]) != 0) {
+		interpret(&state);
+		print_stack(&(state.data_stack));
+		vm_state_destroy(&state);
+	}
 }
 int main(void) {
-	/* interpret_program(program); */
-/* TODO: check stack overwflow while pushing to stack */
+	interpret_program(program);
 }
