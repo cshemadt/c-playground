@@ -3,22 +3,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <stdio.h>
-typedef long Align;
-union mem_block {
-    struct header{
-        size_t size;
-        union mem_block *next;
-        int free;
-    } h;
-    Align align;
-}; 
-#define META_SIZE sizeof(union mem_block)
-#define MIN_MERGE_BLOCK_SIZE 4 // for debug  TODO: make 3 again
-#define MIN_MERG_BLOCK_N 2
-#define MATCH_FOR_MERGING(b) (b)->h.free && (b)->h.size < MIN_MERGE_BLOCK_SIZE
-void *global_base = NULL; /* linked list head */
+#include "u_alloc.h"
 
-union mem_block *find_free_blocks(union mem_block **last, size_t nbytes) {
+union mem_block *find_free_block(union mem_block **last, size_t nbytes) {
     union mem_block *current = global_base;
     while(current && !(current->h.free && current->h.size >= nbytes)) {
         *last = current;
@@ -26,12 +13,21 @@ union mem_block *find_free_blocks(union mem_block **last, size_t nbytes) {
     }
     return current;
 }
-void print_list(union mem_block *head) {
-    while(head) {
-        printf("Element of linked list. Is free: %d; size: %zu\n",head->h.free, head->h.size);
-        head = head->h.next;
+union mem_block *find_prev_block(union mem_block *block) {
+    if(!block || block == global_base)
+        return NULL;
+    union mem_block *current;
+    for(current = global_base;current;current = current->h.next) {
+        if(current->h.next == block)
+            return current;
     }
-    printf("--------------------------------\n"); // TODO: just for debugging purposes; delete it
+    return NULL;
+}
+
+void delete_block(union mem_block *block) {
+    union mem_block *pblock = find_prev_block(block);
+    if(!pblock) return;
+    pblock->h.next = block->h.next;
 }
 union mem_block *get_header(void *ptr) {
     return (union mem_block *)ptr - 1;
@@ -39,7 +35,7 @@ union mem_block *get_header(void *ptr) {
 union mem_block *request_space(union mem_block *last, size_t nbytes) {
     union mem_block *block;
     block = sbrk(0);
-    void *request = sbrk(nbytes + META_SIZE);
+    void *request = sbrk(nbytes + U_MEM_BLOCK);
     assert((void *)block == request);
     if(request == (void *)-1)
         return NULL;
@@ -50,41 +46,28 @@ union mem_block *request_space(union mem_block *last, size_t nbytes) {
     block->h.free=0;
     return block;
 }
-//TODO: add condition when merge free blocks
-void merge_small_blocks() {
-    union mem_block *current = (union mem_block *)global_base;
-    union mem_block *merging = NULL;
-    int flag = 0;
-    unsigned nmerged=0;
-    unsigned merged_size = 0;
-    while(current) {
-        // merge entry point
-        if(flag == 0 && MATCH_FOR_MERGING(current)) {
-            merging = current;
-            flag = 1;
-            nmerged = 1;
-        } else if(flag == 1 && MATCH_FOR_MERGING(current)) { // found block for merging
-            nmerged++;
-            merged_size += current->h.size;
-        }
-        if(MATCH_FOR_MERGING(current) == 0|| !current->h.next) { // if block doesn't match for merging or this is the last block in list -> reset "flags" and "nmerged"
-            if(nmerged > MIN_MERG_BLOCK_N) {
-                merging->h.size += merged_size;
-                merging->h.next = current;
-            }
-            flag = nmerged = merged_size = 0;
-        }
-        current = current->h.next;
-    }
-}
-void free(void *ptr) {
-    union mem_block *header = get_header(ptr);
-    if(!ptr || header->h.free)
+void u_free(void *ptr) {
+    if(!ptr) return;
+    union mem_block *fblock = get_header(ptr);
+    if(fblock->h.free) return;
+    if(fblock == global_base || !fblock->h.next) {
+        fblock->h.free = 1;
         return;
-    header->h.free = 1;
-    merge_small_blocks();
+    }
+    delete_block(fblock);
+    union mem_block *l_block = NULL;
+    union mem_block *l_free_block;
+    if((l_free_block = find_free_block(&l_block, 0)) == NULL) { // If no any free blocks yet -> link freed block of memory to the end of list
+        fblock->h.next = l_block->h.next;
+        l_block->h.next = fblock;
+    } else { // Otherwise, link it to the first free block and merge it
+        l_free_block->h.size += fblock->h.size;
+        if(l_free_block->h.next)
+            l_free_block->h.next = fblock->h.next;
+    }
+    fblock->h.free = 1;
 }
-void *m_malloc(size_t nbytes) {
+void *u_malloc(size_t nbytes) {
     union mem_block *block;
     if(nbytes <= 0)
         return NULL;
@@ -94,7 +77,7 @@ void *m_malloc(size_t nbytes) {
         global_base = block;
     } else {
         union mem_block *last = global_base;
-        if((block = find_free_blocks(&last, nbytes)) == NULL) {
+        if((block = find_free_block(&last, nbytes)) == NULL) {
             block = request_space(last, nbytes);
             if(!block)
                 return NULL;
@@ -110,42 +93,26 @@ void *m_malloc(size_t nbytes) {
     }
     return (block+1);
 }
-void *realloc(void *ptr, size_t nbytes) {
+void *u_realloc(void *ptr, size_t nbytes) {
     if(!ptr)
-        return m_malloc(nbytes);
+        return u_malloc(nbytes);
     union mem_block *block = get_header(ptr);
     if(block->h.size >= nbytes)
         return ptr;
-    union mem_block *new = m_malloc(nbytes);
+    union mem_block *new = u_malloc(nbytes);
     if(!new)
         return NULL;
     memcpy(new,ptr,block->h.size);
-    free(ptr);
+    u_free(ptr);
     return new;
 }
-void *calloc(size_t n, size_t sz) {
+void *u_calloc(size_t n, size_t sz) {
     if(n <= 0 || sz <= 0)
         return NULL;
-    void *ptr = m_malloc(sz*n);
+    void *ptr = u_malloc(sz*n);
     if(!ptr)
         return NULL;
     memset(ptr, 0, sz);
     return ptr;
 }
-int main(void) {
-    char *s = m_malloc(1);
-    char *s1 = m_malloc(2);
-    char *s2 = m_malloc(5);
-    char *s3 = m_malloc(1);
-    char *s4 = m_malloc(2);
-    char *s5 = m_malloc(3);
-    char *s6 = m_malloc(1);
-    free(s);
-    free(s1);
-    free(s2);
-    free(s3);
-    free(s4);
-    free(s5);
-    free(s6);
-    print_list(global_base);
-}
+int main() {}
